@@ -1,8 +1,10 @@
 new_file = []
 
 
-with open("test2.csv", "r+") as f:
+with open("./tmp/test2.csv", "r+") as f:
     for line in f:
+        
+        line = "".join(line.split())
         listed = line.split(",")
         #print(listed)
         listed.pop(1)
