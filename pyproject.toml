@@ -1,0 +1,21 @@
+[project]
+name = "TripCok_models"
+version = "0.1.1"
+description = "Default template for PDM package"
+authors = [
+    {name = "NishNovae", email = "raecrowned@gmail.com"},
+]
+dependencies = [
+    "requests>=2.32.3",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
