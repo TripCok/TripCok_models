@@ -12,7 +12,7 @@ SAVE_FORMAT = ".csv"
 BATCH_SIZE = 10000       # numofrows, size of entries
 
 AREA_BASED_URL = "http://apis.data.go.kr/B551011/KorService1/areaBasedList1"
-DETAIL_COMMON_URL = "http://apis.data.go.kr/B551011/KorService1/detailCommon1"
+#DETAIL_COMMON_URL = "http://apis.data.go.kr/B551011/KorService1/detailCommon1"
 API_KEY = os.getenv("TOURISM_API")
 
 
@@ -69,28 +69,28 @@ def area_based_API(page_no):
 
     return entries, total
 
-def detail_common_API(contentid):
-    params = {
-        "MobileOS": "ETC",
-        "MobileApp": "tester",
-        "_type": "json",
-        "contentId": contentid,
-        "defaultYN": "Y",
-        "overviewYN": "Y",
-        "serviceKey": API_KEY,
-    }
-    try:
-        response = requests.get(DETAIL_COMMON_URL, params=params)
-        response.raise_for_status()
-        data = response.json()
-        item = data['response']['body']['items']['item'][0]
-
-        overview = item.get('overview', 'Unknown')
-        homepage = item.get('homepage', 'Unknown')
-        return overview, homepage
-    except Exception as e:
-        print(f"[ERROR] Failed to fetch details for contentid {contentid}: {e}") 
-        return None, None   
+#def detail_common_API(contentid):
+#    params = {
+#        "MobileOS": "ETC",
+#        "MobileApp": "tester",
+#        "_type": "json",
+#        "contentId": contentid,
+#        "defaultYN": "Y",
+#        "overviewYN": "Y",
+#        "serviceKey": API_KEY,
+#    }
+#    try:
+#        response = requests.get(DETAIL_COMMON_URL, params=params)
+#        response.raise_for_status()
+#        data = response.json()
+#        item = data['response']['body']['items']['item'][0]
+#
+#        overview = item.get('overview', 'Unknown')
+#        homepage = item.get('homepage', 'Unknown')
+#        return overview, homepage
+#    except Exception as e:
+#        print(f"[ERROR] Failed to fetch details for contentid {contentid}: {e}") 
+#        return None, None   
 
 # cat1, cat2, cat3 코드를 카테고리명으로 번역하는 함수
 # 리턴값은 에러가 생긴 횟수 (있다면)
