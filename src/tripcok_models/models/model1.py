@@ -7,13 +7,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from nltk.tokenize import word_tokenize
 import nltk
+import os
 
 nltk.download('punkt')
 DEFAULT_PATH='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/csv_maker/batch/'
 
 def collect_from_batch(path):
     all_files = [f for f in os.listdir(path) if f.endswith('.csv')]
-    dataframes = []
+    data_frames = []
     for file in all_files:
         file_path = os.path.join(path, file)
         df = pd.read_csv(file_path)
