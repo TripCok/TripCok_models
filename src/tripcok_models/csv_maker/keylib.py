@@ -7,9 +7,14 @@ def get_keys():
     API_KEY1 = os.getenv("TOURISM_API1")
     API_KEY2 = os.getenv("TOURISM_API2")
     API_KEY3 = os.getenv("TOURISM_API3")
-    #API_KEY4 = os.getenv("TOURISM_API4")
-    key = [API_KEY1, API_KEY2, API_KEY3]
-   
+    API_KEY4 = os.getenv("TOURISM_API4")
+    API_KEY5 = os.getenv("TOURISM_API5")
+    API_KEY6 = os.getenv("TOURISM_API6")
+    
+    #key = [API_KEY1, API_KEY2, API_KEY3]
+    key = [API_KEY4, API_KEY5, API_KEY6]
+    #key = [API_KEY1, API_KEY2, API_KEY3]
+    
     key = [k for k in key if k]
 
     if not key:  # 키가 없으면 예외 발생
