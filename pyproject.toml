@@ -19,6 +19,9 @@ license = {text = "MIT"}
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
+[project.scripts]
+alc = "tripcok_models.worker.ALC:main"
 
 [tool.pdm]
+packages = [{include = "src"}]
 distribution = true
