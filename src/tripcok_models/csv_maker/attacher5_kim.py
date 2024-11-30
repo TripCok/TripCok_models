@@ -13,7 +13,7 @@ CURRENT_SAVED = "saved_5.csv"
 BATCH_SIZE = 100            # 한 번에 처리할 데이터의 크기
 MAX_RETRIES = 3             # 요청 실패 시 최대 재시도 횟수
 RETRY_DELAY = 5             # 재시도 간 대기 시간 (초 단위)
-START_BATCH = 116             # 처리 시작할 배치 번호 (재시작 시 유용)
+START_BATCH = 185             # 처리 시작할 배치 번호 (재시작 시 유용)
 
 # API 호출 URL
 DETAIL_COMMON_URL = "http://apis.data.go.kr/B551011/KorService1/detailCommon1"

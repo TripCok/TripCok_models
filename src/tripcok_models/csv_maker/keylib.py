@@ -11,7 +11,7 @@ def get_keys():
     API_KEY5 = os.getenv("TOURISM_API5")
     API_KEY6 = os.getenv("TOURISM_API6")
     
-    key = [API_KEY1, API_KEY2, API_KEY3]
+    key = [API_KEY1, API_KEY2, API_KEY3,API_KEY4, API_KEY5, API_KEY6]
     #key = [API_KEY4, API_KEY5, API_KEY6]
     #key = [API_KEY1, API_KEY2, API_KEY3]
     
