@@ -135,11 +135,25 @@ def preprocess_text(df, top_n_words = 10):
     return df
 
 
+def create_vocab(corpus):
+    vocab, reverse_vocab = {}, {}
+    idx = 0
+
+    for sentence in corpus:
+        if word not in vocab:
+            vocab[word] = idx
+            reverse_vocab[idx] = word
+            idx += 1
+    return vocab, reverse_vocab
+
+
 #
-def train_word2vec():
+def train_word2vec(
+    model, corpus, vocab, reverse_vocab, 
+    embedding_dim=100, window_size=2, epochs=10,
+    learning_rate=0.01, batch_size=128, debug_interval=1000
+):
     pass
-
-
 #
 def search_embedding():
     pass
@@ -160,5 +174,7 @@ def main():
     #print(f"[INFO] saved to preprocessed1.csv")
     print(f"[INFO] Preprocessing complete.")
 
+    corpus = df['overview']
+    vocab, reverse_vocab = create_vocab(corpus)
 
 main()
