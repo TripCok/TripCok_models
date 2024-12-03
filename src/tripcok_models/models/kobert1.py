@@ -13,6 +13,11 @@ import numpy as np
 from collections import Counter
 from sklearn.metrics.pairwise import cosine_similarity
 
+import sys
+import time
+
+import threading
+
 DEFAULT_PATH='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/csv_maker/batch/'
 
 stop_words_kr = set([
@@ -135,20 +140,63 @@ def preprocess_text(df, top_n_words=10):
 
 
 def extract_keywords_from_df(df, top_n=10):
-    df['keywords'] = df['overview'].apply(
-        lambda x: extract_keywords(' '.join(x), top_n=top_n)
-    )
+    total_records = len(df)
+
+    def keyword_extraction_with_progress(text, idx):
+        if idx % 100 == 0:
+            print(f"\n[DEBUG] Processed {idx} records out of {total_records}.")
+        return extract_keywords(' '.join(text), top_n=top_n)
+
+    df['keywords'] = [
+        keyword_extraction_with_progress(text, idx)
+        for idx, text in enumerate(df['overview'])
+    ]
+
+    return df
+
+
+
+def loading_animation(message, stop_event):
+    symbols = ["\\", "|", "/", "-"]
+    idx = 0
+    while not stop_event.is_set():
+        sys.stdout.write(f"\r{message} {symbols[idx]}")     # Overwrite the line
+        sys.stdout.flush()
+        idx = (idx + 1) % len(symbols)                      # Cycle through symbols
+        time.sleep(0.2)                                     # animation speed
+    sys.stdout.write("\r" + " "*(len(message) + 2) + "\r")  # Clear the line
 
 
 def main():
+    stop_event = threading.Event()
+
+    animation_thread = threading.Thread(target=loading_animation, args=("Processing...", stop_event))
+    animation_thread.start()
+
+    print("\n[DEBUG] Starting data collection.")
     df = collect_from_batch()
+    print(f"\n[DEBUG] Data collection completed: {len(df)} records fetched.")
+    
+    print("\n[DEBUG] Starting text preprocessing.")    
     df = preprocess_text(df, 100)
+    print(f"\n[DEBUG] Text preprocessing completed. {len(df)} records processed.")
+
+    print("\n[DEBUG] Starting keyword extraction.")
     df = extract_keywords_from_df(df, top_n=100)
+    print(f"\n[DEBUG] Keyword extraction completed. {len(df)} keywords extracted.")
+
+
+    stop_event.set()
+    animation_thread.join()
 
     save_to = "preprocessed_keywords_1.csv"
 
     print(df[['title', 'keywords']].head())
     df.to_csv(save_to, index=False)
-    print(f"[INFO] Results saved to {save_to}")
+    print(f"\n[INFO] Results saved to {save_to}")
+
+    print()
+    print(f"\n[DEBUG] Saving results to {save_to}.")
+
 
 main()
