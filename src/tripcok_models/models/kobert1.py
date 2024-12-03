@@ -34,7 +34,12 @@ stop_words_kr = set([
     '공간이다', '등의', '넓은', '모두', '등을', '즐길', '남아', '모든', '그리고',
     '곳으로', '공간이다', '규모의', '가지', '감상할', '건물'
 ])
-patterns = r"(습니다|다|요|어요|죠|네|겠|네요|니까|고|을|를|은|는|이|가|에|으로|에서|와|과|야|로|든|의)"
+patterns = re.compile(r"""
+    습니다|다|요|어요|죠|네|겠|네요|니까|고|을|를|은|
+    는|이|가|에|으로|에서|와|과|야|든|의|했|으며|으면|등도|들도|
+    으며|었던|였|었|cm|ow|으나|하게|
+    해서|하지|하면|되어|[0-9]호선|되면서
+    """, re.VERBOSE)
 
 tokenizer = get_tokenizer()
 model = get_kobert_model()
@@ -86,6 +91,10 @@ def extract_keywords(text, top_n=100):
     return keywords
 
 
+def clean_tokenized_text(tokens):
+    return [token.replace('_', '') for token in tokens]
+
+
 def collect_from_batch(path=DEFAULT_PATH):
     all_files = [f for f in os.listdir(path) if f.endswith('.csv')]
     if not all_files:
@@ -135,7 +144,6 @@ def merge(df):
 
 def preprocess_text(df, top_n_words=10):
     df = apply_tf_idf(df, top_n_words)
-    df = merge(df)
     return df
 
 
@@ -143,7 +151,7 @@ def extract_keywords_from_df(df, top_n=10):
     total_records = len(df)
 
     def keyword_extraction_with_progress(text, idx):
-        if idx % 100 == 0:
+        if idx % 100 == 0 and idx > 0:
             print(f"\n[DEBUG] Processed {idx} records out of {total_records}.")
         return extract_keywords(' '.join(text), top_n=top_n)
 
@@ -151,9 +159,14 @@ def extract_keywords_from_df(df, top_n=10):
         keyword_extraction_with_progress(text, idx)
         for idx, text in enumerate(df['overview'])
     ]
+    df['keywords'] = df['keywords'].apply(lambda x: clean_tokenized_text(x))
+
+    df['keywords'] = df.apply(
+        lambda row: row['keywords'] + [row['cat3'], row['region']], axis=1
+    )
+
 
     return df
-
 
 
 def loading_animation(message, stop_event):
@@ -182,7 +195,7 @@ def main():
     print(f"\n[DEBUG] Text preprocessing completed. {len(df)} records processed.")
 
     print("\n[DEBUG] Starting keyword extraction.")
-    df = extract_keywords_from_df(df, top_n=100)
+    df = extract_keywords_from_df(df, top_n=50)
     print(f"\n[DEBUG] Keyword extraction completed. {len(df)} keywords extracted.")
 
 
@@ -191,7 +204,7 @@ def main():
 
     save_to = "preprocessed_keywords_1.csv"
 
-    print(df[['title', 'keywords']].head())
+    print(df.head())
     df.to_csv(save_to, index=False)
     print(f"\n[INFO] Results saved to {save_to}")
 
