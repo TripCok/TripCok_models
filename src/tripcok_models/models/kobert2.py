@@ -23,8 +23,6 @@ import threading
 CSV_PATH ='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/csv_maker/batch/'
 PQ_PATH = '/home/nishtala/TripCok/TripCok_models/src/tripcok_models/models/parquet/'
 
-TF_IDF_TRUE = False
-
 # stop_words: 수동으로 잡아낸 제거할 단어들
 stop_words_kr = set([
     '있다', '있고', '있으며', '하는', '하다', '아니라', '이다', '이',
@@ -169,8 +167,8 @@ def main():
 
     # 경로 체크
     for path in [tf_idf_path, keyword_path]:
-        if not os.path.exists(tf_idf_path):
-            os.makedirs(output_path, exist_ok=True)
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
             print(f"\n[INFO] path {path} created.")
         else:
             print(f"\n[INFO] path {path} found.")
@@ -181,10 +179,10 @@ def main():
     animation_thread.start()
 
     # 전역변수: 우리 TF_IDF 처리해서 저장한 적 있나요?
-    if not TF_IDF_TRUE:
+    if not os.listdir(tf_idf_path):
 
         # 없으면 저 멀리 ../csv_maker/batches 에서 가져와
-        df = collect_from_batch(pq_exists=TF_IDF_TRUE)
+        df = collect_from_batch(pq_exists=False)
         print(f"\n[DEBUG] Data collection completed: {len(df)} records fetched.")
     
         # TF_IDF 전처리 후
@@ -193,14 +191,15 @@ def main():
         print(f"\n[DEBUG] Text preprocessing completed. {len(df)} records processed.")
 
         # 저장해줌
-        save_partitioned_pq(df, PQ_PATH + "/tf_idf/", rows_per_partition=5000)
+        save_partitioned_pq(df, tf_idf_path, rows_per_partition=5000)
         print(f"\n[DEBUG] Saved TF-IDF preprocessed .parquet to {PQ_PATH}")
 
-    TF_IDF = True
+    if not os.listdir(tf_idf_path):
+        raise FileNotFoundError(f"[ERROR] There really should be parquet files at this point.")
 
-    all_files = [f for f in os.listdir(PQ_PATH) if f.endswith('.parquet')]
+    all_files = [f for f in os.listdir(tf_idf_path) if f.endswith('.parquet')]
     if all_files:
-        df = pd.read_parquet(os.path.join(PQ_PATH, all_files[0]))
+        df = pd.read_parquet(os.path.join(tf_idf_path, all_files[0]))
         print(f"\n[INFO] Parquet data found. Loading from {PQ_PATH}")
         print(f"\n[INFO] these files should be preprocessed up to tf-idf vectorization.")
     else:
@@ -213,8 +212,7 @@ def main():
     animation_thread.join()
 
     print("\n[INFO] Printing preprocessed text list...")
-    print(df[['title', 'tf_idf']].head())
-    print(df[['title', 'tf_idf']].tail())
+    print(df[['title', 'tf_idf']].sample(7))
 
     return
 
