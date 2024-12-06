@@ -10,8 +10,8 @@ import random
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 DEFAULT_PATH='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/models/'
-
 VECTORIZE_BY = 'keywords' # 'overview' or 'keywords'
+NEED_NEW_MODEL = True       # need to change main: if TRUE train new model else call
 
 def load_data(file_path):
     df = pd.read_csv(file_path)
