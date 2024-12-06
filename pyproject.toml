@@ -16,6 +16,8 @@ dependencies = [
     "transformers>=4.46.3",
     "kobert-transformers>=0.6.0",
     "sentencepiece>=0.2.0",
+    "pyarrow>=18.1.0",
+    "fastparquet>=2024.11.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
