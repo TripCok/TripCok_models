@@ -13,13 +13,9 @@ dependencies = [
     "torch>=2.5.1",
     "nltk>=3.9.1",
     "scikit-learn>=1.5.2",
-    #    "transformers>=4.46.3",
-    #    "kobert-transformers>=0.6.0",
-    #    "sentencepiece>=0.2.0",
-    "pyarrow>=18.1.0",
-    "fastparquet>=2024.11.0",
-    "mecab-ko>=1.0.1",
-    "konlpy>=0.6.0",
+    "transformers>=4.46.3",
+    "kobert-transformers>=0.6.0",
+    "sentencepiece>=0.2.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
