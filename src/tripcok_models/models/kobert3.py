@@ -15,8 +15,12 @@ CSV_PATH ='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/csv_maker/ba
 PQ_PATH = '/home/nishtala/TripCok/TripCok_models/src/tripcok_models/models/parquet/'
 
 # KoBERT model and tokenizer
-model = get_kobert_model(attn_implementation="eager")
+model = get_kobert_model()
 tokenizer = get_tokenizer()
+
+config = model.config
+config.attn_implementation = "eager"
+
 model.eval()
 
 
@@ -47,14 +51,59 @@ def collect_from_batch(pq_exists=False):
     return collected
 
 
+
 # Function to tokenize and get attention scores
-def extract_attention_scores(df, top_n=5, batch_size=8):
+def extract_attention_scores(df, top_n=10):
+    keywords_list = []
+    
+    for idx, row in df.iterrows():
+        text = str(row['overview']) if row['overview'] is not None else ""
+        
+        # Tokenize the text
+        inputs = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
+        outputs = model(**inputs, output_attentions=True)
+        
+        # Extract attention scores (from all layers)
+        attention = outputs.attentions
+        avg_attention = torch.stack(attention).mean(dim=0)  # Average over layers
+        
+        # Focus on CLS token's attention to all tokens
+        cls_attention = avg_attention[0, :, 0].detach().cpu().numpy()  # Detach and move to CPU before converting to NumPy
+
+        tokens = tokenizer.convert_ids_to_tokens(inputs['input_ids'][0].cpu().numpy())
+        
+        # Filter out special tokens
+        special_token_ids = tokenizer.all_special_ids
+        token_attention_pairs = [
+            (token, score)
+            for token, score, token_id in zip(tokens, cls_attention, inputs['input_ids'][0].cpu().numpy())
+            if token_id not in special_token_ids
+        ]
+
+        cls_attention = np.array(cls_attention).flatten()
+        top_n = min(top_n, len(token_attention_pairs), len(cls_attention))
+        top_indices = np.argsort(cls_attention)[::-1][:top_n]
+        top_keywords = [
+            token_attention_pairs[i][0] 
+            for i in top_indices 
+            if i < len(token_attention_pairs)
+        ]
+        
+        keywords_list.append(top_keywords)
+
+    df['keywords'] = keywords_list
+    return df
+
+
+def _extract_attention_scores(df, top_n=5, batch_size=8):
     keywords_list = []
     
     batch_size_actual = len(df)  # Set actual batch size from DataFrame
     for start_idx in range(0, batch_size_actual, batch_size):
         end_idx = min(start_idx + batch_size, batch_size_actual)  # Handle last batch
-        batch_texts = df.iloc[start_idx:end_idx]['overview'].tolist()  # Batch of texts
+        batch_texts = df.iloc[start_idx:end_idx]['overview'].apply(
+            lambda x: str(x) if x is not None else ""
+        ).tolist()
 
         # Tokenize the batch
         inputs = tokenizer(batch_texts, padding=True, truncation=True, return_tensors="pt")
@@ -65,7 +114,7 @@ def extract_attention_scores(df, top_n=5, batch_size=8):
         avg_attention = torch.stack(attention).mean(dim=0)  # Average over layers
         
         # Focus on CLS token's attention to all tokens
-        cls_attention = avg_attention[0, :, 0].cpu().numpy()  # CLS token attention (first token in sequence)
+        cls_attention = avg_attention[0, :, 0].detach().cpu().numpy()  # CLS token attention (first token in sequence)
 
         # Ensure the batch size aligns with cls_attention
         cls_attention = cls_attention[:batch_size_actual]  # Slice to match actual batch size
