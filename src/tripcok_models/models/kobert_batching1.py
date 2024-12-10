@@ -4,10 +4,10 @@ import pandas as pd
 import torch
 import numpy as np
 from kobert_transformers import get_kobert_model, get_tokenizer
-from threading import Thread, Event
+from threading import Thread#, Event
+import gc # garbage collection
 # libraries for logging
 import logging
-import threading
 import time
 import sys
 
@@ -28,7 +28,7 @@ class LoadingAnimationHandler(logging.Handler):
     
     def start(self):
         self.is_running = True
-        self.thread = threading.Thread(target=self.animate, daemon=True)
+        self.thread = Thread(target=self.animate, daemon=True)
         self.thread.start()
     
     def animate(self):
@@ -56,7 +56,10 @@ class BatchLoader():
             raise FileNotFoundError (f"\n[ERROR] BatchLoader failed to find any .csv files.\n")
         
         # .csv 파일 이름 목록 -> 누락/소실된 번호 존재하기 때문
-        self.df_list = [f for f in os.listdir(csv_path) if f.endswith(".csv")]
+        self.df_list = sorted([
+            entry.name for entry in os.scandir(csv_path)
+            if entry.is_file() and entry.name.endswith('.csv')
+        ])
         self.current_idx = 0
 
         if not os.path.exists(keyword_path):
@@ -77,7 +80,8 @@ class BatchLoader():
                 self.current_idx = discovered
             else:
                 logging.info(f"\n[BatchLoader] did not find any complete batches. starting from 0.\n")
- 
+
+
     # returns False when reaches end of csv
     def fetch_current_df(self):
         if self.current_idx >= len(self.df_list):
@@ -100,9 +104,60 @@ class BatchLoader():
 
 # 작업클래스
 class KobertExtractor:
-    def __init__(self):
-        pass
+    def __init__(self, keyword_path: str, top_n: int=10, batch_size=8):
+        self.keyword_path = keyword_path
+        self.top_n = top_n
+        self.batch_size = batch_size
+        self.model = get_kober_model()
+        self.tokenizer = get_tokenizer()
+        
+        self.model.eval()
+        #self.stop_event = Event()
+        #self.animation_thread = None
+    
 
+    def process_batch(self, batch: pd.DataFrame):
+        texts = batch['overview'].tolist()  
+
+        inputs = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
+        with torch.no_grad():
+            outputs = self.model(**inputs, output_attentions=True)
+
+        # Extract attention scores
+        attention = outputs.attentions
+        avg_attention = torch.stack(attention).mean(dim=0)
+        cls_attention = avg_attention[0, :, 0].detach().cpu().numpy()
+
+        # Extract keywords
+        tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0].cpu().numpy())
+        special_token_ids = self.tokenizer.all_special_ids
+
+        token_attention_pairs = [
+            (token, score)
+            for token, score, token_id in zip(tokens, cls_attention, inputs['input_ids'][0].cpu().numpy())
+            if token_id not in special_token_ids
+        ]
+        sorted_pairs = sorted(token_attention_pairs, key=lambda x: x[1], reverse=True)
+        top_keywords = [pair[0] for pair in sorted_pairs[:self.top_n]]
+
+        return top_keywords
+
+    def extract_keywords(self, df: pd.DataFrame):
+        # Split the dataframe into smaller batches
+        batches = [df.iloc[i:i + self.batch_size] for i in range(0, len(df), self.batch_size)]
+        all_keywords = []
+
+        for batch in batches:
+            keywords = self.process_batch(batch)
+            all_keywords.extend(keywords)  # Add the results from this batch
+            
+            # Clear memory after processing the batch
+            del batch, keywords
+            gc.collect()  # Collect garbage
+
+        return all_keywords
+
+            
 
 
 CSV_PATH ='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/csv_maker/batch/'
