@@ -10,14 +10,11 @@ CURRENT_SAVED = "saved_5.csv"
 BATCH_SIZE = 100
 MAX_RETRIES = 3
 RETRY_DELAY = 5     # secs
-START_BATCH = 9     # on fail, retry from last checkpoint by changing this
+START_BATCH = 10    # on fail, retry from last checkpoint by changing this
 
 DETAIL_COMMON_URL = "http://apis.data.go.kr/B551011/KorService1/detailCommon1"
 API_KEY = os.getenv("TOURISM_API")
 
-
-if not API_KEY:
-    raise ValueError("\n[ERROR] API KEY missing.")
 
 stop_event = threading.Event()
 
