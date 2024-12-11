@@ -47,7 +47,7 @@ class LoadingAnimationHandler(logging.Handler):
 
 # 파일 read
 class BatchLoader():
-    def __init__(self, csv_path: str, keyword_path: str, working_batch_size: int=32):
+    def __init__(self, csv_path: str, keyword_path: str, working_batch_size: int=16):
         self.csv_path = csv_path
         self.keyword_path = keyword_path
         self.working_batch_size = working_batch_size
@@ -108,34 +108,47 @@ class KobertExtractor:
         self.keyword_path = keyword_path
         self.top_n = top_n
         self.batch_size = batch_size
-        self.model = get_kober_model()
+        self.model = get_kobert_model()
         self.tokenizer = get_tokenizer()
         
         self.model.eval()
         #self.stop_event = Event()
         #self.animation_thread = None
-    
 
+    # for a given batch, extract keywords
     def process_batch(self, batch: pd.DataFrame):
-        texts = batch['overview'].tolist()  
-
+        texts = [
+            text for text in batch['overview'].tolist() 
+            if isinstance(text, str) and len(text.strip()) > 0
+        ]
+        if not texts:
+            logging.warning("Skipping batch with no valid text data.")
+            return []
+        
         inputs = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
+        
         with torch.no_grad():
             outputs = self.model(**inputs, output_attentions=True)
 
         # Extract attention scores
         attention = outputs.attentions
         avg_attention = torch.stack(attention).mean(dim=0)
-        cls_attention = avg_attention[0, :, 0].detach().cpu().numpy()
 
         # Extract keywords
         tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0].cpu().numpy())
-        special_token_ids = self.tokenizer.all_special_ids
+        cls_attention = avg_attention[0, :, 0].detach().cpu().numpy()
 
+        if len(tokens) != len(cls_attention):
+            logging.error(f"Token-Attention mismatch: {len(tokens)} tokens, {len(cls_attention)} attention scores.")
+            logging.error(f"Tokens: {tokens}")
+            logging.error(f"CLS attention: {cls_attention}")
+            return []
+
+        special_token_ids = self.tokenizer.all_special_ids
         token_attention_pairs = [
             (token, score)
             for token, score, token_id in zip(tokens, cls_attention, inputs['input_ids'][0].cpu().numpy())
-            if token_id not in special_token_ids
+            if token_id not in special_token_ids and not np.isnan(score) and score > 0.01
         ]
         sorted_pairs = sorted(token_attention_pairs, key=lambda x: x[1], reverse=True)
         top_keywords = [pair[0] for pair in sorted_pairs[:self.top_n]]
@@ -153,7 +166,6 @@ class KobertExtractor:
             
             # Clear memory after processing the batch
             del batch, keywords
-            gc.collect()  # Collect garbage
 
         return all_keywords
 
@@ -178,12 +190,12 @@ def main():
     try:
         batch_loader = BatchLoader(csv_path=CSV_PATH, keyword_path=KEYWORD_PATH)       
         handler.start()
-        logger.info("Testing...")
+        logger.info("Processing...")
 
-        df = batch_loader.fetch_current_df()
-        while df is not None:
-            batch_loader.update()
-            df = batch_loader.fetch_current_df()
+        #df = batch_loader.fetch_current_df()
+        #while df is not None:
+        #    batch_loader.update()
+        #    df = batch_loader.fetch_current_df()
 
             #if batch_loader.current_idx % 100 == 0:
             #    print(df[['title', 'overview']].head())
@@ -192,6 +204,57 @@ def main():
     finally:
         handler.stop()
 
+def main_single_batch():
+    logger = logging.getLogger("")
+    logger.setLevel(logging.INFO)
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    logger.addHandler(console_handler)
+
+    handler = LoadingAnimationHandler()
+    logger.addHandler(handler)
+
+    try:
+        batch_loader = BatchLoader(csv_path=CSV_PATH, keyword_path=KEYWORD_PATH)
+        handler.start()
+        logger.info("Processing a single batch...")
+
+        df = batch_loader.fetch_current_df()
+        if df is not None:
+            kobert_extractor = KobertExtractor(keyword_path=KEYWORD_PATH)
+
+            logger.info("[DEBUG] Extracting keywords from the first batch...")
+            single_batch_keywords = kobert_extractor.process_batch(df.iloc[:kobert_extractor.batch_size])
+            
+            logger.info(f"[DEBUG] Keywords for the first batch:\n{single_batch_keywords}")
+        else:
+            logger.error("No data found in the first batch.")
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+    finally:
+        handler.stop()
+
+def test_single_batch():
+    # Initialize paths and batch loader
+    batch_loader = BatchLoader(csv_path=CSV_PATH, keyword_path=KEYWORD_PATH)
+    kobert_extractor = KobertExtractor(keyword_path=KEYWORD_PATH, top_n=5)
+
+    # Fetch a single batch
+    single_batch_df = batch_loader.fetch_current_df()
+    if single_batch_df is not None:
+        logging.info("[DEBUG] Extracting keywords from the first batch...")
+        try:
+            keywords = kobert_extractor.process_batch(single_batch_df.head(1))  # Process a single row for simplicity
+            print(f"Extracted keywords: {keywords}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+    else:
+        print("No data to process!")
+
+
 
 if __name__ == "__main__":
-    main()
+#    main()
+#    main_single_batch()
+    test_single_batch()
