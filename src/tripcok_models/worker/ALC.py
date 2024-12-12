@@ -9,8 +9,8 @@ def main():
     dirname = os.path.dirname(path)
 
     CSV_FILE = os.path.join(dirname, "category.csv")
-    ADMIN_ID = int(input("Enter Admin Id (default: 1): ")) or 1
-    ip = input("Enter IP address (default: localhost): )") or "localhost"
+    ADMIN_ID = int(input("Enter Admin Id (default: 1): ") or 1)
+    ip = input("Enter IP address (default: localhost): ") or "localhost"
     port = input("Enter port (default: 8080): ") or 8080
     API_URL = f"http://{ip}:{port}/api/v1/place/category"
 
