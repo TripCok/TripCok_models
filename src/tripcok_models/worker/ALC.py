@@ -1,8 +1,7 @@
 import csv
-from os.path import dirname
+import os
 
 from tripcok_models.worker.request_utils import *
-import os
 
 
 def main():
@@ -10,8 +9,10 @@ def main():
     dirname = os.path.dirname(path)
 
     CSV_FILE = os.path.join(dirname, "category.csv")
-    ADMIN_ID = int(input("관리자 계정의 고유번호를 입력해주세요 : "))
-    API_URL = "http://localhost:8080/api/v1/place/category"
+    ADMIN_ID = int(input("Enter Admin Id (default: 1): ")) or 1
+    ip = input("Enter IP address (default: localhost): )") or "localhost"
+    port = input("Enter port (default: 8080): ") or 8080
+    API_URL = f"http://{ip}:{port}/api/v1/place/category"
 
     with open(CSV_FILE, "r") as f:
         reader = csv.reader(f)
@@ -64,3 +65,7 @@ def main():
             print(f"CREATE : category = {api_request['name']}")
         else:
             second_category_id = third_request[0]["id"]
+
+
+if __name__ == "__main__":
+    main()
