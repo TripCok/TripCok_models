@@ -16,6 +16,7 @@ dependencies = [
     "transformers>=4.46.3",
     "kobert-transformers>=0.6.0",
     "sentencepiece>=0.2.0",
+    "sentence-transformers>=3.3.1",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
