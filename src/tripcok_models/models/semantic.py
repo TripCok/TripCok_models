@@ -8,6 +8,7 @@ import pickle
 import warnings
 
 import torch.nn.functional as F
+import numpy as np
 
 warnings.filterwarnings('ignore')
 
@@ -34,6 +35,7 @@ class CsvLoader:
                 # data clean
                 df = df.dropna(subset=['overview'])
                 df = df[df['overview'].str.strip() != ""]
+                df = df[df['overview'].str.strip() != "-"]
                 data_frames.append(df)
             except (FileNotFoundError, pd.errors.EmptyDataError) as e:
                 logging.warning(f"[ERROR] could not process file {file}: {str(e)}. Skipping...")
@@ -115,27 +117,25 @@ class SemanticSearch:
             raise RuntimeError("[ERROR] No embeddings were generated.")
         logging.info(f"[INFO] Successfully generated embeddings for {len(self.contentid_map)} items.")
 
-    def search(self, queries: list, top_k: int=5, filter_list: list=None, similarity_threshold: float = 0.5):
+    def convert_to_int(self, value):
+        if isinstance(value, (np.int64, np.int32)):
+            return int(value)
+        return value
+
+    def search(self, queries: list, top_k: int=5, 
+    similarity_threshold: float = 0.5,
+    max_similarity_score: float = 0.95):
         if self.corpus_embeddings is None:
             raise ValueError("[ERROR] Corpus is empty. Add data using add_corpus().")
 
         result_dict = {}
-        for query in queries:
+        for query in queries:   # each query is a string
             # generate query embedding 
             query_embedding = self.embedder.encode(query, convert_to_tensor=True).cpu()
             cos_scores = util.pytorch_cos_sim(query_embedding, self.corpus_embeddings)[0]
             cos_scores = cos_scores.cpu()
-
-            # threshold -> softmax
             cos_scores[cos_scores < similarity_threshold] = 0
             #cos_scores = F.softmax(cos_scores, dim=0)
-
-            filter_indices = []
-            if filter_list:
-                filter_indices = [
-                    self.contentid_map.index(cid) for cid in filter_list
-                    if cid in self.contentid_map
-                ]
 
             # determine query index
             query_index = (
@@ -143,24 +143,51 @@ class SemanticSearch:
                 if query in self.contentid_map else None
             )
 
-            # determine top-k
-            top_k = min(
-                len(self.contentid_map),
-                top_k + len(filter_indices) + (1 if query_index is not None else 0)
-            )
-
-            # get results
-            top_results = torch.topk(cos_scores, k=top_k).indices.numpy()
+            # get results: K=top_k+1 for account to identical entry
+            top_results = torch.topk(cos_scores, k=top_k+1).indices.numpy()
 
             for idx in top_results:
-                if idx == query_index or idx in filter_indices:
-                    continue    
+                cid = self.contentid_map[idx]
+                score = cos_scores[idx].item()
+
+                if score > max_similarity_score: continue
+               # print(f"cid: {cid}, {type(cid)}")
+ 
                 if cos_scores[idx] > 0:
-                    result_dict[self.contentid_map[idx]] = cos_scores[idx].item()
+                    result_dict[cid] = cos_scores[idx].item()
                 if len(result_dict) >= top_k:
                     break
         
-    #    logging.info(f"TYPECHECK: {type(result_dict)}")
+        return result_dict
+
+    def search_from_cid(self, contentids: list, top_k: int = 5, similarity_threshold: float = 0.5):
+        """Search method for contentids (not text queries)."""
+        if self.corpus_embeddings is None:
+            raise ValueError("[ERROR] Corpus is empty. Add data using add_corpus().")
+
+        result_dict = {}
+        
+        # Get indices corresponding to the contentid list
+        contentid_indices = [
+            idx for idx, cid in enumerate(self.contentid_map) if cid in contentids
+        ]
+        
+        if not contentid_indices:
+            logging.warning("[WARNING] No matching contentids found in the corpus.")
+            return result_dict
+        
+        # Compute similarity scores between selected contentids
+        cos_scores = util.pytorch_cos_sim(self.corpus_embeddings[contentid_indices], self.corpus_embeddings)
+        
+        for idx in contentid_indices:
+            cid = self.contentid_map[idx]
+            if cos_scores[idx][idx] < similarity_threshold:  # threshold similarity
+                continue
+            result_dict[cid] = cos_scores[idx][idx].item()
+
+            if len(result_dict) >= top_k:
+                break
+
         return result_dict
 
     def save_model(self, path: str):
@@ -217,8 +244,9 @@ def main():
     random_row = df.sample(1).iloc[0]
     query = random_row['overview']
     
-    logging.info(f"[DEBUG] Query: {random_row['title']}")
+    logging.info(f"[DEBUG] Query: {random_row['title']}, {random_row['contentid']}")
     logging.info(f"[DEBUG] Query: {query}\n")
+    print("*"*50,end='\n\n')
 
     results = searcher.search([query], top_k=5)
 
@@ -230,6 +258,10 @@ def main():
         logging.info(f"[RESULT {idx}]")
         logging.info(f"Contentid: {cid}, similarity score: {score}")
         logging.info(f"Title: {title}\nOverview:{overview}\n")
+    
+
+    # Testing 2
+
 
 if __name__ == "__main__":
     main()
