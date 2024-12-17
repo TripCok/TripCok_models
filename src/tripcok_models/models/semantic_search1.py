@@ -5,68 +5,106 @@ import pickle
 import os
 import pandas as pd
 import warnings
+import logging
+
+from torch.utils.data import DataLoader
+import torch
 
 warnings.filterwarnings('ignore')
+CSV_PATH ='/home/nishtala/TripCok/TripCok_models/src/tripcok_models/csv_maker/batch/'
 
-class CsvLoader():
-    def __init__(self, csv_path: str)
+
+class CsvLoader:
+    def __init__(self, csv_path: str):
         self.csv_path = csv_path
-
         if not os.path.exists(csv_path):
-            raise FileNotFoundError (f"\n[ERROR] BatchLoader failed to find any .csv files.\n")
+            raise FileNotFoundError (f"\n[ERROR] BatchLoader failed to find any .csv files in {self.csv_path}.\n")
         
         self.df_list = sorted([
             entry.name for entry in os.scandir(csv_path)
             if entry.is_file() and entry.name.endswith('.csv')
         ])
 
+    def fetch_df(self):
+        data_frames = []
+        for file in self.df_list:
+            file_path = os.path.join(self.csv_path, file)
+            try:
+                df = pd.read_csv(file_path)[['contentid', 'title', 'overview']]
+                data_frames.append(df)
+            except FileNotFoundError:
+                logging.info(f"[ERROR] could not find file {file}. Skipping...")
+                continue
+        
+        return pd.concat(data_frames, ignore_index=True)
+        
 
-    
 
-
+# need to make so that search() does not include the query itself as result
+# maybe implement contentid? but memory is something to consider
 class SemanticSearch:
     def __init__(self, model_name="jhgan/ko-sroberta-multitask"):
         self.model_name = model_name
         self.embedder = SentenceTransformer(model_name)
-        self.corpus = []
+        self.corpus = []    # list of dictionaries
         self.corpus_embeddings = None
 
-    def add_corpus(self, corpus):
-        self.corpus = corpus
-        self.corpus_embeddings = self.embedder.encode(corpus, convert_to_tensor=True)
+    def add_corpus(self, contentids: pd.Series, overviews: pd.Series, batch_size: int=32):
 
+        self.corpus = [
+            {"contentid": cid, "overview": overview}
+            for cid, overview in zip(contentids, overviews)
+        ]
+
+        data_loader = DataLoader(overviews_list, batch_size = batch_size)
+        embeddings = []
+
+        for batch in data_loader:
+            batch embeddings = self.embedder.encode(batch, convert_to_tensor=True)
+            embeddings.append(batch_embeddings)
+
+        self.corpus_embeddings = torch.cat(embeddings, dim=0)
+
+    # query will enter in form of contentid
+    # grab corresponding overview -> run model -> exclude self
     def search(self, query, top_k=5):
         query_embedding = self.embedder.encode(query, convert_to_tensor=True)
         cos_scores = util.pytorch_cos_sim(query_embedding, self.corpus_embeddings)[0]
         cos_scores = cos_scores.cpu()
 
-        top_k = min(len(self.corpus), top_k)
+        top_k = min(len(self.corpus), top_k+1)  # query exclusion
         top_results = np.argpartition(-cos_scores, range(top_k))[0:top_k]
+        results = []
+        
+        # re-implement self exclusion; dict will make this efficient
+        for idx in top_results:
+            contentid = self.corpus[idx]["contentid"]
+            overview = self.corpus[idx]["overview"]
+            score = float(cos_scores[idx])
+            results.append({"contentid": contentid, "overview": overview, "score": score})
+        
+        return results
 
-        return [ 
-            (self.corpus[idx].strip(), float(cos_scores[idx]))
-            for idx in top_results[0:top_k]
-        ]
 
-        def save_model(self, path):
-            state = {
-                'corpus': self.corpus, 
-                'corpus_embeddings': self.corpus_embeddings,
-                'model_name': self.model_name
-            }
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'wb') as f:
-                pickle.dump(state, f)
+    def save_model(self, path):
+        state = {
+            'corpus': self.corpus, 
+            'corpus_embeddings': self.corpus_embeddings,
+            'model_name': self.model_name
+        }
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            pickle.dump(state, f)
             
-        @classmethod
-        def load_model(cls, path):
-            with open(path, 'rb') as f:
-                state = picckle.load(f)
+    @classmethod
+    def load_model(cls, path):
+        with open(path, 'rb') as f:
+            state = pickle.load(f)
 
-            searcher = cls(model_name = state['model_name'])
-            searcher.corpus = state['corpus']
-            searcher.corpus_embeddings = state['corpus_embeddings']
-            return searcher
+        searcher = cls(model_name = state['model_name'])
+        searcher.corpus = state['corpus']
+        searcher.corpus_embeddings = state['corpus_embeddings']
+        return searcher
 
 
 def tester():
@@ -114,6 +152,32 @@ def tester():
     # loaded_searcher = SemanticSearch.load_model("models/semantic_search.pkl")    
 
 
+def main():
+    model_name = "semantic_search.pkl"
+    searcher = None
+    
+    if os.path.exists(model_path):
+        searcher = SemanticSearch.load_model(model_path)
+    else:
+        csv_loader = CsvLoader(CSV_PATH)
+        df = csv_loader.fetch_df()
+
+        searcher = SemanticSearch()
+        searcher.add_corpus(df['contentid'], df['overview'])
+
+    # testing
+    logging.info(f"[DEBUG] testing random query...")
+    random_row = df.sample(1).iloc[0]
+    query = random_row['overview']
+    logging.info(f"[DEBUG] Testing with query: {query}")
+    results = searcher.search(query, top_k=5)
+    
+    for overview, score in results:
+        logging.log(f"[RESULT] Overview: {overview}\nScore: {score}\n{'-'*50}")
+
+
+
+
 if __name__ == "__main__":
-#    main()
-    tester()
+    main()
+#    tester()
