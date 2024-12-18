@@ -129,8 +129,10 @@ class SemanticSearch:
             raise ValueError("[ERROR] Corpus is empty. Add data using add_corpus().")
 
         result_dict = {}
-        for query in queries:   # each query is a string
-            # generate query embedding 
+
+        # for each query string
+        for query in queries:   
+            # generate embeddings
             query_embedding = self.embedder.encode(query, convert_to_tensor=True).cpu()
             cos_scores = util.pytorch_cos_sim(query_embedding, self.corpus_embeddings)[0]
             cos_scores = cos_scores.cpu()
@@ -160,32 +162,39 @@ class SemanticSearch:
         
         return result_dict
 
-    def search_from_cid(self, contentids: list, top_k: int = 5, 
+    def search_cid(self, contentids: list, top_k: int = 5, 
     similarity_threshold: float = 0.5):
         if self.corpus_embeddings is None:
             raise ValueError("[ERROR] Corpus is empty. Add data using add_corpus().")
 
         result_dict = {}
         # Get indices corresponding to the contentid list
-        contentid_indices = [
-            idx for idx, cid in enumerate(self.contentid_map) if cid in contentids
+        input_cid_indices = [
+            idx for idx, cid in enumerate(self.contentid_map) 
+            if cid in contentids
         ]
         
-        if not contentid_indices:
-            logging.warning("[WARNING] No matching contentids found in the corpus.")
+        if not input_cid_indices:
+            logging.warning("[WARNING] No matching contentids found.")
             return result_dict
         
-        # Compute similarity scores between selected contentids
-        cos_scores = util.pytorch_cos_sim(self.corpus_embeddings[contentid_indices], self.corpus_embeddings)
-        
-        for idx in contentid_indices:
-            cid = self.contentid_map[idx]
-            if cos_scores[idx][idx] < similarity_threshold:  # threshold similarity
-                continue
-            result_dict[cid] = cos_scores[idx][idx].item()
+        for input_index in input_cid_indices:
+            # embedding for current index            
+            embedding = self.corpus_embeddings[input_index]
+            # scores & result
+            cos_scores = util.pytorch_cos_sim(embedding, self.corpus_embeddings)[0]
+            cos_scores = cos_scores.cpu()
+            top_results = torch.topk(cos_scores, k=top_k+1).indices.numpy()
 
-            if len(result_dict) >= top_k:
-                break
+            for result_index in top_results:
+                if result_index == input_index:               # index location for results
+                    continue                                  # avoid self-match
+                
+                result_cid = self.contentid_map[result_index]     # cid for results
+                result_dict[result_cid] = cos_scores[result_index].item()
+    
+                if len(result_dict) >= top_k:
+                    break
 
         return result_dict
 
@@ -198,13 +207,14 @@ class SemanticSearch:
         with open(path, 'rb') as f:
             return pickle.load(f)
 
+
 def testing_text(searcher: SemanticSearch, df: pd.DataFrame, query_num: int=1):
     print(f"[DEBUG] running testing_text() with random query text...")
     
     for i in range(query_num):
         random_row = df.sample(1).iloc[0]
         query = random_row['overview']
-        print(f"[DEBUG] Testing query 1: {random_row['contentid']}: {random_row['title']}")
+        print(f"[DEBUG] Testing query {i}: {random_row['contentid']}: {random_row['title']}")
         print(f"[DEBUG] Text: {query.partition('.')[0]}... \n")
 
         results = searcher.search([query], top_k=5)
@@ -219,7 +229,26 @@ def testing_text(searcher: SemanticSearch, df: pd.DataFrame, query_num: int=1):
             print(f"[DEBUG] Similarity Score: {score}")
             print(f"[DEBUG] Text: {shortened}... \n")
 
+def testing_cid(searcher: SemanticSearch, df: pd.DataFrame, query_num: int=1):
+    print(f"[DEBUG] running testing_cid() with random query cid...")
 
+    for i in range(query_num):
+        random_row = df.sample(1).iloc[0]
+        cid, title, text = random_row['contentid'], random_row['title'], random_row['overview']
+        print(f"[DEBUG] Testing cid 1: {cid}: {title}")
+        print(f"[DEBUG] Text: {text.partition('.')[0]}...\n")
+
+        results = searcher.search_cid([cid], top_k=5)
+
+        for idx, result_cid in enumerate(results, start=1):
+            result_title = df[df['contentid'] == result_cid]['title'].iloc[0]
+            result_text = df[df['contentid'] == result_cid]['overview'].iloc[0]
+            shortened = result_text.partition('.')[0]
+            score = results[result_cid]
+
+            print(f"[DEBUG] RESULT #{idx}: {result_cid}: {result_title}")
+            print(f"[DEBUG] Similarity Score: {score}")
+            print(f"[DEBUG] Text: {shortened}...\n")
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -258,10 +287,11 @@ def main():
         logging.info(f"[INFO] Saving trained model to {model_path}.")
         searcher.save_model(model_path)
 
-    # Testing
-    testing_text(searcher, df, query_num=1)
+    # Testing for text input
+    #testing_text(searcher, df, query_num=1)
 
-    # Testing 2
+    # Testing for cid input
+    testing_cid(searcher, df, query_num=1)
 
 
 if __name__ == "__main__":
