@@ -1,0 +1,34 @@
+[project]
+name = "TripCok_models"
+version = "0.1.1"
+description = "Default template for PDM package"
+authors = [
+    {name = "NishNovae", email = "raecrowned@gmail.com"},
+]
+dependencies = [
+    "requests>=2.32.3",
+    "pandas>=2.2.3",
+    "numpy>=2.1.3",
+    "scipy>=1.13.0",
+    "torch>=2.5.1",
+    "nltk>=3.9.1",
+    "scikit-learn>=1.5.2",
+    "transformers>=4.46.3",
+    "kobert-transformers>=0.6.0",
+    "sentencepiece>=0.2.0",
+    "sentence-transformers>=3.3.1",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project.scripts]
+alc = "tripcok_models.worker.ALC:main"
+
+[tool.pdm]
+packages = [{include = "src"}]
+distribution = true
