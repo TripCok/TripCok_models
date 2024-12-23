@@ -44,11 +44,8 @@ class CsvLoader:
         return pd.concat(data_frames, ignore_index=True)
 
 class SemanticSearch:
-    def __init__(self, model_name: str = None, batch_size=128):
-        if model_name is not None:
-            self.embedder = SentenceTransformer(model_name)
-        else:
-            self.embedder = None
+    def __init__(self, model_name: str, batch_size=128):
+        self.embedder = SentenceTransformer(model_name)
         self.batch_size = batch_size
         self.corpus_embeddings = None
         self.contentid_map = []
@@ -204,13 +201,6 @@ class SemanticSearch:
     def save_model(self, path: str):
         with open(path, 'wb') as f:
             pickle.dump(self, f)
-
-    def load_from_pickle(self, model_path: str):#, contentid_path: str):
-        self = self.load_model(path=model_path)
-        return self
-        
-#        with open(contentid_path, 'rb') as f:
-#            self.content
 
     @staticmethod
     def load_model(path: str):
