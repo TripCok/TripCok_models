@@ -1,5 +1,5 @@
 import pickle
-from tripcock_model import SemanticSearch
+from tripcok_model import SemanticSearch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os
