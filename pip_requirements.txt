@@ -1,1 +1,0 @@
-pip install torch sentence-transformers fastapi pydantic pandas numpy fastapi uvicorn
