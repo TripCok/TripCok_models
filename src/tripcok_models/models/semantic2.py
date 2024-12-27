@@ -44,8 +44,11 @@ class CsvLoader:
         return pd.concat(data_frames, ignore_index=True)
 
 class SemanticSearch:
-    def __init__(self, model_name: str, batch_size=128):
-        self.embedder = SentenceTransformer(model_name)
+    def __init__(self, model_name: str = None, batch_size=128):
+        if model_name is not None:
+            self.embedder = SentenceTransformer(model_name)
+        else:
+            self.embedder = None
         self.batch_size = batch_size
         self.corpus_embeddings = None
         self.contentid_map = []
@@ -202,6 +205,13 @@ class SemanticSearch:
         with open(path, 'wb') as f:
             pickle.dump(self, f)
 
+    def load_from_pickle(self, model_path: str):#, contentid_path: str):
+        self = self.load_model(path=model_path)
+        return self
+        
+#        with open(contentid_path, 'rb') as f:
+#            self.content
+
     @staticmethod
     def load_model(path: str):
         with open(path, 'rb') as f:
@@ -228,6 +238,8 @@ def testing_text(searcher: SemanticSearch, df: pd.DataFrame, query_num: int=1):
             print(f"[DEBUG] RESULT #{idx}: {cid}: {title}")
             print(f"[DEBUG] Similarity Score: {score}")
             print(f"[DEBUG] Text: {shortened}... \n")
+    
+    return results
 
 def testing_cid(searcher: SemanticSearch, df: pd.DataFrame, query_num: int=1):
     print(f"[DEBUG] running testing_cid() with random query cid...")
@@ -249,6 +261,8 @@ def testing_cid(searcher: SemanticSearch, df: pd.DataFrame, query_num: int=1):
             print(f"[DEBUG] RESULT #{idx}: {result_cid}: {result_title}")
             print(f"[DEBUG] Similarity Score: {score}")
             print(f"[DEBUG] Text: {shortened}...\n")
+
+    return results
 
 def main():
     logging.basicConfig(level=logging.INFO)
